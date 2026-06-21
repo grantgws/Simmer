@@ -1,7 +1,7 @@
 # Launch copy
 
-> Replace `REPO_URL` with the real GitHub link before posting. Attach
-> `assets/simmer-demo.gif` to the **first** tweet — the GIF is the whole pitch.
+> Repo: https://github.com/grantgws/Simmer (make it public before posting).
+> Attach `assets/simmer-demo.gif` to the **first** tweet — the GIF is the whole pitch.
 
 ## X / Twitter — single tweet (simplest)
 
@@ -9,7 +9,7 @@
 >
 > So I made Simmer 🦀 — a menu-bar crab that shows what Claude's doing. He wiggles while working, pops a "!" + chime when he needs you, arms up when he's done.
 >
-> Free & open source: REPO_URL
+> Free & open source: https://github.com/grantgws/Simmer
 
 *(Attach the GIF. Keep the link in the same tweet for a utility this small.)*
 
@@ -33,7 +33,7 @@
 **3/**
 > Free and open source. One click to connect, one click to remove.
 >
-> REPO_URL
+> https://github.com/grantgws/Simmer
 >
 > (Built it for fun with Claude Code itself. Not affiliated with Anthropic.)
 
@@ -47,7 +47,7 @@
 > chimes + pops a "!" when it needs you, and celebrates when a turn finishes. It
 > handles multiple sessions and runs entirely locally (no account/server).
 >
-> Free + open source: REPO_URL. Feedback welcome — it's my first Mac app.
+> Free + open source: https://github.com/grantgws/Simmer. Feedback welcome — it's my first Mac app.
 
 ## awesome-claude-code (durable, low-effort traffic)
 
@@ -55,7 +55,7 @@ Open a PR adding Simmer to a relevant section (e.g. "Tooling" / "Status lines")
 of github.com/hesreallyhim/awesome-claude-code (and similar lists). One line:
 
 > **Simmer** — a menu-bar mascot that shows your Claude Code session status
-> (working / needs you / done) with sound + notifications. [REPO_URL]
+> (working / needs you / done) with sound + notifications. [https://github.com/grantgws/Simmer]
 
 ## Posting tips
 - Post the GIF natively (don't just link it) — autoplay carries this app.

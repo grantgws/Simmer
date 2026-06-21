@@ -283,7 +283,7 @@ enum Connection {
 
 enum Updates {
     // Set this to your GitHub repo ("owner/name") once published.
-    static let repo = "grantshaver/simmer"
+    static let repo = "grantgws/Simmer"
 
     static var current: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
