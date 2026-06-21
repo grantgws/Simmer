@@ -1,71 +1,71 @@
 # Simmer
 
-A tiny macOS menu bar companion for [Claude Code](https://claude.com/claude-code).
-A little pixel crab sits in your menu bar and mirrors what Claude is doing — so
-you can glance up (or walk away) and know when it needs you.
+Simmer is a lightweight macOS menu bar app that surfaces the live status of your
+[Claude Code](https://claude.com/claude-code) sessions. See at a glance whether
+Claude is working, waiting on you, or finished — and jump straight to the session
+that needs attention.
 
-![Simmer demo](assets/simmer-demo.gif)
+![Simmer](assets/simmer-demo.gif)
 
-<p>
-  <img src="assets/shot-working.png" width="32%" alt="Working">
-  <img src="assets/shot-action.png" width="32%" alt="Action needed">
-  <img src="assets/shot-done.png" width="32%" alt="Done">
-</p>
+## Features
 
-- 🦀 **Working** — the crab's legs wiggle, with a slowly-changing status word
-- 🔔 **Needs you** — a "!" pops up, plus a soft chime + notification
-- ✅ **Done** — arms-up celebration and a gentle "finished" chime
-- 💤 **Idle** — he naps
+- **At-a-glance status** in the menu bar — working, action needed, done, or idle.
+- **Multiple sessions** tracked at once. The menu bar reflects the most urgent
+  session; the dropdown lists every session with its current state.
+- **Audible and visual alerts** when a session needs input or finishes.
+- **Jump to a session** — click any session to bring its terminal window forward.
+- **Local only.** No account, no network, no telemetry. All state stays on your Mac.
 
-It handles **multiple Claude sessions at once** (it shows the most urgent one and
-lists each in the dropdown), and everything runs **entirely on your Mac** — no
-server, no account, no telemetry, nothing leaves your machine.
+## Requirements
 
-> Not affiliated with or endorsed by Anthropic. "Claude" and "Claude Code" are
-> trademarks of Anthropic. Simmer is an independent, free community tool.
+- macOS 13 or later
+- [Claude Code](https://claude.com/claude-code)
+- Xcode (to build from source)
 
 ## Install
-
-Requires [Xcode](https://apps.apple.com/app/xcode/id497799835) (free).
-
-**One command** — clone and build:
 
 ```sh
 gh repo clone grantgws/Simmer && cd Simmer && ./install.sh
 ```
 
-That builds Simmer and drops it in `/Applications`. (Or just open
-`Simmer.xcodeproj` in Xcode and hit Run.)
+`install.sh` builds a release binary and installs it to `/Applications`.
+Alternatively, open `Simmer.xcodeproj` in Xcode and run.
 
-Then:
-1. Click the crab in your menu bar → **Connect to Claude Code** (adds Simmer's
-   hooks to `~/.claude/settings.json` for you).
-2. **Restart Claude Code** (hooks load when a session starts).
-3. Optional: toggle **Launch at login**.
+After installing:
 
-## Permissions
-
-Simmer asks for the minimum, and only when needed:
-
-- **Notifications** — to alert you when Claude needs input. (First run prompts you.)
-- **Automation (Terminal)** — *only* when you click a session to jump to its
-  terminal. It can bring a window to the front; it cannot type or change anything.
-
-Nothing else — Simmer never sends data off your Mac.
-
-## Uninstall (clean)
-
-Click **Disconnect from Claude Code** in the dropdown *before* deleting the app.
-This removes Simmer's hooks so your Claude Code keeps working. Then quit and drag
-the app to the Trash.
+1. Open the menu bar item and choose **Connect to Claude Code**. This registers
+   Simmer's hooks in `~/.claude/settings.json`.
+2. Restart any running Claude Code sessions so the hooks take effect.
+3. Optionally enable **Launch at Login**.
 
 ## How it works
 
-Claude Code fires [hooks](https://docs.claude.com/en/docs/claude-code/hooks) on
-events (prompt submitted, tool use, waiting for you, turn finished). Simmer's
-hook writes a tiny per-session status file under `~/.claude/simmer/sessions/`,
-and the app watches those files and updates the crab. That's it.
+Claude Code emits [hooks](https://docs.claude.com/en/docs/claude-code/hooks) on
+session events — prompt submitted, tool use, awaiting input, and turn complete.
+Simmer installs a small hook script that records each session's state to a
+per-session file in `~/.claude/simmer/sessions/`. The app watches that directory
+and renders the aggregate status.
+
+Connecting writes Simmer's hooks to `~/.claude/settings.json` (backing the file
+up first and refusing to modify it if it can't be parsed). Disconnecting removes
+those hooks cleanly, so uninstalling never leaves Claude Code in a broken state.
+
+## Permissions
+
+- **Notifications** — to alert you when a session needs input.
+- **Automation (Terminal)** — used only when you click a session to focus its
+  terminal window. Simmer can raise a window; it cannot read or type anything.
+
+## Uninstall
+
+Choose **Disconnect from Claude Code** in the menu (this removes Simmer's hooks),
+then quit Simmer and move it to the Trash.
+
+## Building and releasing
+
+See [SIGNING.md](SIGNING.md) and [RELEASING.md](RELEASING.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE). Not affiliated with or endorsed by Anthropic. "Claude" and
+"Claude Code" are trademarks of Anthropic.

@@ -11,3 +11,16 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Local working notes — not part of the published repo
+BRIEF.md
+DECISIONS.md
+NEXT.md
+MARKETING.md
+
+# Promo/marketing asset sources (kept locally)
+assets/make_promo.swift
+assets/make_gif.swift
+assets/gen_music.py
+assets/simmer-promo.mp4
+assets/simmer-music.wav
