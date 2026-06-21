@@ -7,6 +7,10 @@ that needs attention.
 
 ![Simmer](assets/simmer-demo.gif)
 
+▶ **[Watch the full demo](assets/simmer-promo.mp4)** (with sound)
+
+<video src="https://github.com/grantgws/Simmer/raw/main/assets/simmer-promo.mp4" controls width="100%"></video>
+
 ## Features
 
 - **At-a-glance status** in the menu bar — working, action needed, done, or idle.
