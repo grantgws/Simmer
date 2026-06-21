@@ -23,3 +23,9 @@ assets/make_promo.swift
 assets/make_gif.swift
 assets/gen_music.py
 assets/simmer-music.wav
+
+# Superseded by assets/simmer-promo.gif (kept locally)
+assets/simmer-demo.gif
+assets/shot-action.png
+assets/shot-done.png
+assets/shot-working.png

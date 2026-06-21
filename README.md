@@ -5,11 +5,9 @@ Simmer is a lightweight macOS menu bar app that surfaces the live status of your
 Claude is working, waiting on you, or finished — and jump straight to the session
 that needs attention.
 
-![Simmer](assets/simmer-demo.gif)
+![Simmer demo](assets/simmer-promo.gif)
 
-▶ **[Watch the full demo](assets/simmer-promo.mp4)** (with sound)
-
-<video src="https://github.com/grantgws/Simmer/raw/main/assets/simmer-promo.mp4" controls width="100%"></video>
+▶ **[Watch with sound](assets/simmer-promo.mp4)**
 
 ## Features
 
