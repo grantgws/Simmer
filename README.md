@@ -7,7 +7,7 @@ that needs attention.
 
 ![Simmer demo](assets/simmer-promo.gif)
 
-▶ **[Watch with sound](assets/simmer-promo.mp4)**
+**[⬇ Download for macOS](https://github.com/grantgws/Simmer/releases/latest)** · ▶ [Watch with sound](assets/simmer-promo.mp4)
 
 ## Features
 
@@ -26,12 +26,22 @@ that needs attention.
 
 ## Install
 
+**Download (no Xcode needed):**
+
+1. Grab `Simmer.zip` from the [latest release](https://github.com/grantgws/Simmer/releases/latest) and unzip it.
+2. Move **Simmer.app** to your **Applications** folder.
+3. Simmer isn't notarized yet, so macOS flags it as from an "unidentified
+   developer." Clear the quarantine flag once, in Terminal:
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/Simmer.app
+   ```
+   *(Or right-click Simmer.app → Open → Open.)*
+
+**Or build from source** (requires Xcode):
+
 ```sh
 gh repo clone grantgws/Simmer && cd Simmer && ./install.sh
 ```
-
-`install.sh` builds a release binary and installs it to `/Applications`.
-Alternatively, open `Simmer.xcodeproj` in Xcode and run.
 
 After installing:
 
