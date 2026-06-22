@@ -523,6 +523,27 @@ enum TerminalFocus {
                 end if
             end tell
             """)
+        } else if s.term == "iTerm.app" && !s.tty.isEmpty {
+            let dev = s.tty.hasPrefix("/dev/") ? s.tty : "/dev/\(s.tty)"
+            // iTerm2 exposes a `tty` per session (its term for a split pane). Match
+            // it, then select the window, tab, and session so we land on the exact
+            // pane — not just the app.
+            run("""
+            tell application "iTerm"
+                activate
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        repeat with theSession in sessions of t
+                            if tty of theSession is "\(dev)" then
+                                select w             -- raise the window
+                                select t             -- bring the tab to the front
+                                select theSession    -- focus the pane within it
+                            end if
+                        end repeat
+                    end repeat
+                end repeat
+            end tell
+            """)
         } else if !s.term.isEmpty {
             // Other terminals: just bring the app forward (no per-tab control yet).
             run("tell application \"\(appName(for: s.term))\" to activate")
