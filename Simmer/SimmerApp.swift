@@ -595,6 +595,9 @@ struct SimmerMenu: View {
     @State private var launchAtLogin = false
     @State private var hoveredSession: String?
     @State private var settingsBroken = false
+    @State private var editingTTY: String?
+    @State private var draftName: String = ""
+    @FocusState private var nameFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -617,27 +620,7 @@ struct SimmerMenu: View {
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 ForEach(monitor.sessions) { s in
-                    Button { TerminalFocus.focus(s) } label: {
-                        HStack(spacing: 8) {
-                            Circle().fill(dotColor(s.state)).frame(width: 7, height: 7)
-                            Text(displayName(s)).lineLimit(1).truncationMode(.middle)
-                            Spacer()
-                            Text(word(s.state)).foregroundStyle(.secondary)
-                        }
-                        .font(.caption)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(.ultraThinMaterial)
-                                .opacity(hoveredSession == s.id ? 1 : 0)
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hoveredSession = $0 ? s.id : nil }
-                    .help("Click to jump to this session's terminal")
+                    sessionRow(s)
                 }
                 .padding(.horizontal, -8)   // let the hover pill breathe to the edges
             }
@@ -695,6 +678,9 @@ struct SimmerMenu: View {
             monitor.refreshTitles()
             monitor.checkForUpdates()
         }
+        .onChange(of: nameFieldFocused) { focused in
+            if !focused { commitEditing() }   // no-op if already committed/cancelled
+        }
     }
 
     private var headline: String {
@@ -727,6 +713,59 @@ struct SimmerMenu: View {
         if sameName && !s.tty.isEmpty { return "\(s.project) · \(s.tty)" }
         return s.project
     }
+    private func beginEditing(_ s: SessionStatus) {
+        guard !s.tty.isEmpty else { return }   // no stable agnostic key -> not renameable
+        draftName = monitor.names[s.tty] ?? ""
+        editingTTY = s.tty
+        nameFieldFocused = true
+    }
+
+    // Save the draft (empty clears) and leave edit mode. Guarded so a cancel
+    // (which nils editingTTY first) and the resulting focus-loss don't double-fire.
+    private func commitEditing() {
+        guard let tty = editingTTY else { return }
+        monitor.setName(draftName, forTTY: tty)
+        editingTTY = nil
+    }
+
+    @ViewBuilder
+    private func sessionRow(_ s: SessionStatus) -> some View {
+        let base = HStack(spacing: 8) {
+            Circle().fill(dotColor(s.state)).frame(width: 7, height: 7)
+            if editingTTY == s.tty {
+                TextField("Name", text: $draftName)
+                    .textFieldStyle(.plain)
+                    .focused($nameFieldFocused)
+                    .onSubmit { commitEditing() }          // Enter saves
+                    .onExitCommand { editingTTY = nil }     // Esc cancels (no save)
+            } else {
+                Text(displayName(s)).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer()
+            Text(word(s.state)).foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.ultraThinMaterial)
+                .opacity(hoveredSession == s.id ? 1 : 0)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .onHover { hoveredSession = $0 ? s.id : nil }
+        .help("Click to jump · double-click to rename")
+
+        if editingTTY == s.tty {
+            base
+        } else {
+            base
+                .onTapGesture(count: 2) { beginEditing(s) }
+                .onTapGesture(count: 1) { TerminalFocus.focus(s) }
+        }
+    }
+
     private func dotColor(_ s: ClaudeState) -> Color {
         switch s {
         case .idle: return .gray
