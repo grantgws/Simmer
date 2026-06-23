@@ -15,7 +15,8 @@ that needs attention.
 - **Multiple sessions** tracked at once. The menu bar reflects the most urgent
   session; the dropdown lists every session with its current state.
 - **Audible and visual alerts** when a session needs input or finishes.
-- **Jump to a session** — click any session to bring its terminal window forward.
+- **Jump to a session** — click any session to bring its terminal forward; in
+  Terminal and iTerm2 it focuses the exact tab and pane.
 - **Local only.** No account, no network, no telemetry. All state stays on your Mac.
 
 ## Requirements
@@ -65,8 +66,9 @@ those hooks cleanly, so uninstalling never leaves Claude Code in a broken state.
 ## Permissions
 
 - **Notifications** — to alert you when a session needs input.
-- **Automation (Terminal)** — used only when you click a session to focus its
-  terminal window. Simmer can raise a window; it cannot read or type anything.
+- **Automation (Terminal / iTerm)** — used only when you click a session to focus
+  its terminal. Simmer can raise a window and select its tab/pane; it cannot read
+  or type anything.
 
 ## Uninstall
 
