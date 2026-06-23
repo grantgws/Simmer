@@ -6,8 +6,8 @@
 #
 # Usage: set-status.sh <arg>
 #   working | done | idle  -> write that state
-#   notify                 -> permission/approval prompt becomes "action";
-#                             a plain "waiting for input" is ignored.
+#   notify                 -> only a permission/approval prompt becomes "action";
+#                             all other notifications are ignored (no false alarms).
 #   end                    -> session closed: delete its file.
 ARG="${1:-idle}"
 
@@ -48,10 +48,14 @@ if arg == "end":
 
 state = arg
 if arg == "notify":
+    # Only a genuine permission/approval request counts as "action needed".
+    # Every other notification (idle "waiting for your input", etc.) is ignored,
+    # so the menu bar does not cry wolf.
     msg = (d.get("message") or "").lower()
-    if "waiting" in msg and "input" in msg:
+    if ("permission" in msg) or ("approve" in msg) or ("wants to" in msg):
+        state = "action"
+    else:
         sys.exit(0)
-    state = "action"
 
 tty = os.environ.get("SIMMER_TTY") or ""
 term = os.environ.get("TERM_PROGRAM") or ""
