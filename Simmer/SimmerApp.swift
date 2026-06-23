@@ -315,6 +315,36 @@ enum LoginItem {
     }
 }
 
+// MARK: - Custom session names
+//
+// User-chosen labels for sessions, keyed by tty so a name rides along across the
+// sessions that run in a given terminal/pane. Stored in UserDefaults (Simmer's own
+// UI state — not Claude data, so it never touches the hook-owned session files).
+// Keying on tty (a POSIX id captured the same way for every terminal/shell) keeps
+// this terminal/shell agnostic.
+
+enum SessionNames {
+    private static let key = "sessionNames"
+
+    static func all() -> [String: String] {
+        (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
+    }
+
+    static func set(_ raw: String, forTTY tty: String) {
+        guard !tty.isEmpty else { return }
+        var map = all()
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            map.removeValue(forKey: tty)   // empty input clears the name
+        } else {
+            map[tty] = trimmed
+        }
+        UserDefaults.standard.set(map, forKey: key)
+    }
+
+    static func clear(forTTY tty: String) { set("", forTTY: tty) }
+}
+
 // MARK: - Monitor
 
 final class StatusMonitor: ObservableObject {
@@ -326,6 +356,7 @@ final class StatusMonitor: ObservableObject {
     @Published var panelIcon: NSImage = Critter.panelImages[.sleeping]!
     @Published var connected: Bool = Connection.isConnected
     @Published var titles: [String: String] = [:]   // tty -> Claude's session title
+    @Published var names: [String: String] = SessionNames.all()  // tty -> user-chosen name
     @Published var updateURL: URL?                   // set if a newer release exists
 
     /// Ask GitHub for the latest release; if newer than installed, expose its URL.
@@ -381,6 +412,13 @@ final class StatusMonitor: ObservableObject {
             }
             DispatchQueue.main.async { self.titles = map }
         }
+    }
+
+    /// Persist (or clear, on empty input) a user-chosen name for a tty, and
+    /// republish so the roster updates live.
+    func setName(_ raw: String, forTTY tty: String) {
+        SessionNames.set(raw, forTTY: tty)
+        names = SessionNames.all()
     }
 
     private let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -678,7 +716,9 @@ struct SimmerMenu: View {
     // If two sessions share a name (e.g. both running in the home folder), append
     // their unique terminal id so they're distinguishable.
     private func displayName(_ s: SessionStatus) -> String {
-        // Prefer Claude's session title (e.g. "Explore Mac app…") when we have it.
+        // A user-chosen name always wins.
+        if let custom = monitor.names[s.tty], !custom.isEmpty { return custom }
+        // Otherwise prefer Claude's session title (e.g. "Explore Mac app…").
         if let title = monitor.titles[s.tty], !title.isEmpty, title != "Claude Code" {
             return title
         }
