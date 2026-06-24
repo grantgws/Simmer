@@ -553,7 +553,22 @@ final class StatusMonitor: ObservableObject {
 // to the front — it can ONLY focus a window, never type or change anything.
 
 enum TerminalFocus {
+    // Debug log, written to ~/Library/Logs/Simmer/focus.log when enabled via the
+    // "Copy debug log" menu item. Helps diagnose terminal-focusing across setups.
+    static let logURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/Simmer/focus.log")
+    static func log(_ line: String) {
+        let stamped = "\(ISO8601DateFormatter().string(from: Date()))  \(line)\n"
+        try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let h = try? FileHandle(forWritingTo: logURL) {
+            h.seekToEndOfFile(); h.write(stamped.data(using: .utf8)!); try? h.close()
+        } else {
+            try? stamped.data(using: .utf8)!.write(to: logURL)
+        }
+    }
+
     static func focus(_ s: SessionStatus) {
+        log("click: term=\(s.term) tty=\(s.tty) project=\(s.project)")
         if s.term == "Apple_Terminal" && !s.tty.isEmpty {
             let dev = s.tty.hasPrefix("/dev/") ? s.tty : "/dev/\(s.tty)"
             // Find the window id holding the matching tty, select that tab, then
@@ -578,9 +593,11 @@ enum TerminalFocus {
                     activate
                 end if
             end tell
-            """)
+            """, tag: "Terminal-focus")
         } else if s.term == "iTerm.app" && !s.tty.isEmpty {
             let dev = s.tty.hasPrefix("/dev/") ? s.tty : "/dev/\(s.tty)"
+            log("branch=iTerm dev=\(dev) — listing iTerm ttys for comparison")
+            run("tell application \"iTerm\"\n set out to \"\"\n repeat with w in windows\n repeat with t in tabs of w\n repeat with ss in sessions of t\n set out to out & (tty of ss) & \" \"\n end repeat\n end repeat\n end repeat\n return out\nend tell", tag: "iTerm-inventory")
             // iTerm2 exposes a `tty` per session (its term for a split pane). Match
             // it, then select the window, tab, and session so we land on the exact
             // pane — not just the app.
@@ -606,11 +623,14 @@ enum TerminalFocus {
                 else if (count of windows) > 0 then
                     activate
                 end if
+                return matched
             end tell
-            """)
+            """, tag: "iTerm-focus")
         } else if !s.term.isEmpty {
-            // Other terminals: just bring the app forward (no per-tab control yet).
-            run("tell application \"\(appName(for: s.term))\" to activate")
+            log("branch=fallback app=\(appName(for: s.term))")
+            run("tell application \"\(appName(for: s.term))\" to activate", tag: "fallback")
+        } else {
+            log("branch=NONE (term empty or no tty) term=\(s.term) tty=\(s.tty)")
         }
     }
 
@@ -623,14 +643,23 @@ enum TerminalFocus {
         }
     }
 
-    private static func run(_ source: String) {
+    private static func run(_ source: String, tag: String = "") {
         // Run osascript as a subprocess — reliable, unlike NSAppleScript which
         // silently fails window targeting from a menu-bar app.
         DispatchQueue.global(qos: .userInitiated).async {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             p.arguments = ["-e", source]
-            try? p.run()
+            let out = Pipe(), err = Pipe()
+            p.standardOutput = out; p.standardError = err
+            do {
+                try p.run(); p.waitUntilExit()
+                let o = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let e = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                log("[\(tag)] exit=\(p.terminationStatus) out=\"\(o)\" err=\"\(e)\"")
+            } catch {
+                log("[\(tag)] spawn failed: \(error)")
+            }
         }
     }
 }
@@ -732,8 +761,17 @@ struct SimmerMenu: View {
             Divider()
             Text("Simmer · for Claude Code\nNot affiliated with Anthropic · Runs entirely on your Mac")
                 .font(.caption2).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
-            Button("Quit Simmer") { NSApplication.shared.terminate(nil) }
-                .keyboardShortcut("q")
+            HStack {
+                Button("Quit Simmer") { NSApplication.shared.terminate(nil) }
+                    .keyboardShortcut("q")
+                Spacer()
+                Button("Copy debug log") {
+                    let log = (try? String(contentsOf: TerminalFocus.logURL, encoding: .utf8)) ?? "(no log yet — click a session first)"
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(log, forType: .string)
+                }
+                .font(.caption2)
+            }
         }
         .padding(14)
         .frame(width: 280)
