@@ -508,7 +508,6 @@ enum TerminalFocus {
             // raise the window BY ID (raising via the loop reference is unreliable).
             run("""
             tell application "Terminal"
-                activate
                 set theID to missing value
                 repeat with w in windows
                     repeat with t in tabs of w
@@ -518,7 +517,10 @@ enum TerminalFocus {
                         end if
                     end repeat
                 end repeat
+                -- Only raise Terminal once we've actually found the matching tab,
+                -- so a mislabeled session never pops a blank window.
                 if theID is not missing value then
+                    activate
                     set frontmost of window id theID to true
                 end if
             end tell
@@ -530,11 +532,12 @@ enum TerminalFocus {
             // pane — not just the app.
             run("""
             tell application "iTerm"
-                activate
+                set matched to false
                 repeat with w in windows
                     repeat with t in tabs of w
                         repeat with theSession in sessions of t
                             if tty of theSession is "\(dev)" then
+                                set matched to true
                                 select w             -- raise the window
                                 select t             -- bring the tab to the front
                                 select theSession    -- focus the pane within it
@@ -542,6 +545,8 @@ enum TerminalFocus {
                         end repeat
                     end repeat
                 end repeat
+                -- Only bring iTerm forward if we found the pane.
+                if matched then activate
             end tell
             """)
         } else if !s.term.isEmpty {
