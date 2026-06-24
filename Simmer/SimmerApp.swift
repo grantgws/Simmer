@@ -387,6 +387,7 @@ final class StatusMonitor: ObservableObject {
         .appendingPathComponent(".claude/simmer/sessions")
     private var tickCount = 0
     private var previousState: ClaudeState = .idle
+    private var liveTTYs: Set<String> = []   // ttys currently owned by a running process
 
     init(preview: ClaudeState? = nil) {
         if let preview {
@@ -395,13 +396,36 @@ final class StatusMonitor: ObservableObject {
             return
         }
         Notifier.shared.setup()
+        refreshLiveTTYs()
         pruneStaleFiles()
         Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.tick() }
         tick()
     }
 
+    /// The set of ttys (e.g. "ttys003") currently in use by a running process.
+    /// When a terminal is closed — even abruptly — its tty leaves this set, so we
+    /// can drop the session immediately, even if SessionEnd never fired.
+    private func refreshLiveTTYs() {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/ps")
+        p.arguments = ["-Ao", "tty="]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        guard (try? p.run()) != nil else { return }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        guard let text = String(data: data, encoding: .utf8) else { return }
+        var set = Set<String>()
+        for line in text.split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if !t.isEmpty && t != "??" { set.insert(t) }
+        }
+        if !set.isEmpty { liveTTYs = set }   // never wipe on a transient ps failure
+    }
+
     private func tick() {
         tickCount += 1
+        if tickCount % 6 == 0 { refreshLiveTTYs() }   // ~every 3s
         let all = readSessions()
         // Show every known session, most urgent first (needs you > working > done > idle).
         let rank: [ClaudeState: Int] = [.action: 3, .working: 2, .done: 1, .idle: 0]
@@ -449,7 +473,8 @@ final class StatusMonitor: ObservableObject {
         case .working:
             let i = Int(Date().timeIntervalSince1970 / 6) % workingWords.count
             menuBarText = "\(workingWords[i])…"
-            detail = sessions.count > 1 ? "\(sessions.count) sessions working" : "Claude is working"
+            let workingN = sessions.filter { $0.state == .working }.count
+            detail = workingN > 1 ? "\(workingN) sessions working" : "Claude is working"
         case .action:
             menuBarText = "Action needed"
             detail = "Claude needs you — permission or input"
@@ -464,24 +489,43 @@ final class StatusMonitor: ObservableObject {
             return []
         }
         let now = Date().timeIntervalSince1970
-        return files.filter { $0.pathExtension == "json" }.compactMap { url in
+        var rows: [(s: SessionStatus, ts: Double, url: URL, tty: String)] = []
+        for url in files where url.pathExtension == "json" {
             guard let data = try? Data(contentsOf: url),
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let raw = obj["state"] as? String,
-                  var st = ClaudeState(rawValue: raw) else { return nil }
+                  var st = ClaudeState(rawValue: raw) else { continue }
             let ts = (obj["ts"] as? Double) ?? (obj["ts"] as? NSNumber)?.doubleValue ?? 0
             let age = now - ts
-            // Safety net: a normally-closed session deletes its own file (SessionEnd
-            // hook). If one is older than 30 min it's stale/crashed — drop it so the
-            // roster only shows live sessions.
-            if age > 1800 { return nil }
+            if age > 1800 { try? FileManager.default.removeItem(at: url); continue }  // stale/crashed
             if st == .done && age > 6 { st = .idle }
             let cwd = (obj["cwd"] as? String) ?? ""
             let tty = (obj["tty"] as? String) ?? ""
             let term = (obj["term"] as? String) ?? ""
-            return SessionStatus(id: url.deletingPathExtension().lastPathComponent,
-                                 state: st, cwd: cwd, tty: tty, term: term)
+            // Terminal gone — its tty is no longer owned by any process? Drop it.
+            // Covers closing the window/tab outright (SessionEnd never fires).
+            let bareTTY = tty.replacingOccurrences(of: "/dev/", with: "")
+            if !bareTTY.isEmpty && !liveTTYs.isEmpty && !liveTTYs.contains(bareTTY) {
+                try? FileManager.default.removeItem(at: url); continue
+            }
+            let s = SessionStatus(id: url.deletingPathExtension().lastPathComponent,
+                                  state: st, cwd: cwd, tty: tty, term: term)
+            rows.append((s, ts, url, bareTTY))
         }
+        // De-duplicate by tty (a closed session's tty can be reused by a new one):
+        // keep the newest per tty and delete the superseded files.
+        var bestByTTY: [String: (s: SessionStatus, ts: Double, url: URL, tty: String)] = [:]
+        var result = rows.filter { $0.tty.isEmpty }.map { $0.s }
+        for r in rows where !r.tty.isEmpty {
+            if let cur = bestByTTY[r.tty] {
+                if r.ts >= cur.ts { try? FileManager.default.removeItem(at: cur.url); bestByTTY[r.tty] = r }
+                else { try? FileManager.default.removeItem(at: r.url) }
+            } else {
+                bestByTTY[r.tty] = r
+            }
+        }
+        result.append(contentsOf: bestByTTY.values.map { $0.s })
+        return result
     }
 
     private func pruneStaleFiles() {
