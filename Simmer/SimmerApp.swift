@@ -354,6 +354,12 @@ final class StatusMonitor: ObservableObject {
     /// roster can show "Explore Mac app…" instead of just the folder. Called when
     /// the dropdown opens — no constant polling. Terminal.app only.
     func refreshTitles() {
+        // Only query Terminal if it's ALREADY running. `tell application "Terminal"`
+        // auto-launches it otherwise, which would pop a stray Terminal in the Dock
+        // for people who only use iTerm/Ghostty/etc.
+        let termRunning = NSWorkspace.shared.runningApplications
+            .contains { $0.bundleIdentifier == "com.apple.Terminal" }
+        guard termRunning else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let script = """
             tell application "Terminal"
