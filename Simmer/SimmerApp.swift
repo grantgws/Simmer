@@ -326,7 +326,15 @@ final class StatusMonitor: ObservableObject {
     @Published var panelIcon: NSImage = Critter.panelImages[.sleeping]!
     @Published var connected: Bool = Connection.isConnected
     @Published var titles: [String: String] = [:]   // tty -> Claude's session title
+    @Published var names: [String: String] = SessionNames.all()  // session id -> custom name
     @Published var updateURL: URL?                   // set if a newer release exists
+
+    /// Save (or clear, on empty input) a user-chosen name for a session, and
+    /// republish so the roster updates immediately.
+    func setName(_ raw: String, for sessionID: String) {
+        SessionNames.set(raw, for: sessionID)
+        names = SessionNames.all()
+    }
 
     /// Ask GitHub for the latest release; if newer than installed, expose its URL.
     func checkForUpdates() {
@@ -629,11 +637,34 @@ enum TerminalFocus {
 
 // MARK: - Dropdown panel (status + sessions + setup/settings)
 
+// MARK: - Custom session names
+//
+// User-chosen labels, keyed by Claude's session id and stored in UserDefaults
+// (Simmer's own UI state — never touches Claude's data). Local to Simmer: there
+// is no way to push a name back into a Claude Code session.
+
+enum SessionNames {
+    private static let key = "sessionNames"
+    static func all() -> [String: String] {
+        (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
+    }
+    static func set(_ raw: String, for sessionID: String) {
+        guard !sessionID.isEmpty else { return }
+        var map = all()
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { map.removeValue(forKey: sessionID) } else { map[sessionID] = trimmed }
+        UserDefaults.standard.set(map, forKey: key)
+    }
+}
+
 struct SimmerMenu: View {
     @ObservedObject var monitor: StatusMonitor
     @State private var launchAtLogin = false
     @State private var hoveredSession: String?
     @State private var settingsBroken = false
+    @State private var editingID: String?
+    @State private var draftName = ""
+    @FocusState private var nameFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -655,30 +686,8 @@ struct SimmerMenu: View {
                 Text("No Claude Code sessions yet.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                ForEach(monitor.sessions) { s in
-                    Button { TerminalFocus.focus(s) } label: {
-                        HStack(spacing: 8) {
-                            Circle().fill(dotColor(s.state)).frame(width: 7, height: 7)
-                            Text(displayName(s)).lineLimit(1).truncationMode(.middle)
-                            Spacer()
-                            Text(word(s.state)).foregroundStyle(.secondary)
-                        }
-                        .font(.caption)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(.ultraThinMaterial)
-                                .opacity(hoveredSession == s.id ? 1 : 0)
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hoveredSession = $0 ? s.id : nil }
-                    .help("Click to jump to this session's terminal")
-                }
-                .padding(.horizontal, -8)   // let the hover pill breathe to the edges
+                ForEach(monitor.sessions) { s in sessionRow(s) }
+                    .padding(.horizontal, -8)   // let the hover pill breathe to the edges
             }
 
             // Connection status / onboarding
@@ -731,9 +740,56 @@ struct SimmerMenu: View {
         .onAppear {
             launchAtLogin = LoginItem.enabled
             settingsBroken = Connection.settingsUnreadable
+            editingID = nil
             monitor.refreshTitles()
             monitor.checkForUpdates()
         }
+        .onChange(of: nameFieldFocused) { focused in
+            if !focused { commitEditing() }   // commit when the field loses focus
+        }
+    }
+
+    private func beginEditing(_ s: SessionStatus) {
+        draftName = monitor.names[s.id] ?? ""
+        editingID = s.id
+        nameFieldFocused = true
+    }
+    private func commitEditing() {
+        guard let id = editingID else { return }
+        monitor.setName(draftName, for: id)
+        editingID = nil
+    }
+
+    @ViewBuilder
+    private func sessionRow(_ s: SessionStatus) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(dotColor(s.state)).frame(width: 7, height: 7)
+            if editingID == s.id {
+                TextField("Name", text: $draftName)
+                    .textFieldStyle(.plain)
+                    .focused($nameFieldFocused)
+                    .onSubmit { commitEditing() }
+                    .onExitCommand { editingID = nil }   // Esc cancels
+            } else {
+                Text(displayName(s)).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer()
+            Text(word(s.state)).foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.ultraThinMaterial)
+                .opacity(hoveredSession == s.id ? 1 : 0)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .onHover { hoveredSession = $0 ? s.id : nil }
+        .onTapGesture(count: 2) { beginEditing(s) }
+        .onTapGesture { if editingID == nil { TerminalFocus.focus(s) } }
+        .help("Click to jump to its terminal · double-click to rename")
     }
 
     private var headline: String {
@@ -755,7 +811,9 @@ struct SimmerMenu: View {
     // If two sessions share a name (e.g. both running in the home folder), append
     // their unique terminal id so they're distinguishable.
     private func displayName(_ s: SessionStatus) -> String {
-        // Prefer Claude's session title (e.g. "Explore Mac app…") when we have it.
+        // A name you set yourself wins over everything.
+        if let name = monitor.names[s.id], !name.isEmpty { return name }
+        // Otherwise prefer Claude's session title (e.g. "Explore Mac app…").
         if let title = monitor.titles[s.tty], !title.isEmpty, title != "Claude Code" {
             return title
         }
