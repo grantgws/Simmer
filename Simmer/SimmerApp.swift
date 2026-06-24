@@ -522,6 +522,8 @@ enum TerminalFocus {
                 if theID is not missing value then
                     activate
                     set frontmost of window id theID to true
+                else if (count of windows) > 0 then
+                    activate
                 end if
             end tell
             """)
@@ -545,8 +547,13 @@ enum TerminalFocus {
                         end repeat
                     end repeat
                 end repeat
-                -- Only bring iTerm forward if we found the pane.
-                if matched then activate
+                -- Bring iTerm forward if we found the pane; if not, still raise it
+                -- (only when it's already open) so a tmux/split session lands there.
+                if matched then
+                    activate
+                else if (count of windows) > 0 then
+                    activate
+                end if
             end tell
             """)
         } else if !s.term.isEmpty {
